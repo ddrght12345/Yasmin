@@ -42,11 +42,11 @@ namespace CharlotteDunois\Yasmin\Models;
  */
 class GuildMember extends ClientBase {
     protected $guild;
-    
+
     protected $id;
     protected $user;
     protected $nickname;
-    
+
     protected $deaf;
     protected $mute;
     protected $selfDeaf = false;
@@ -55,26 +55,26 @@ class GuildMember extends ClientBase {
     protected $suppress = false;
     protected $voiceChannelID;
     protected $voiceSessionID;
-    
+
     protected $joinedTimestamp;
     protected $roles;
-    
+
     /**
      * @internal
      */
     function __construct(\CharlotteDunois\Yasmin\Client $client, \CharlotteDunois\Yasmin\Models\Guild $guild, array $member) {
         parent::__construct($client);
         $this->guild = $guild;
-        
+
         $this->id = $member['user']['id'];
         $this->user = $this->client->users->patch($member['user']);
-        
+
         $this->roles = new \CharlotteDunois\Yasmin\Utils\Collection();
         $this->joinedTimestamp = (new \DateTime((!empty($member['joined_at']) ? $member['joined_at'] : 'now')))->getTimestamp();
-        
+
         $this->_patch($member);
     }
-    
+
     /**
      * @inheritDoc
      *
@@ -86,34 +86,34 @@ class GuildMember extends ClientBase {
         if(\property_exists($this, $name)) {
             return $this->$name;
         }
-        
+
         switch($name) {
             case 'bannable':
                 if($this->id === $this->guild->ownerID || $this->id === $this->client->user->id) {
                     return false;
                 }
-                
+
                 $member = $this->guild->me;
                 if($member->permissions->has(\CharlotteDunois\Yasmin\Constants::PERMISSIONS['BAN_MEMBERS']) === false) {
                     return false;
                 }
-                
+
                 return ($member->highestRole->comparePositionTo($this->highestRole) > 0);
             break;
             case 'colorRole':
                 $roles = $this->roles->filter(function ($role) {
                     return $role->color;
                 });
-                
+
                 if($roles->count() === 0) {
                     return null;
                 }
-                
+
                 return $roles->reduce(function ($prev, $role) {
                     if($prev === null) {
                         return $role;
                     }
-                    
+
                     return ($role->comparePositionTo($prev) > 0 ? $role : $prev);
                 });
             break;
@@ -122,7 +122,7 @@ class GuildMember extends ClientBase {
                 if($colorRole !== null && $colorRole->color > 0) {
                     return $colorRole->color;
                 }
-                
+
                 return null;
             break;
             case 'displayHexColor':
@@ -130,7 +130,7 @@ class GuildMember extends ClientBase {
                 if($colorRole !== null && $colorRole->color > 0) {
                     return $colorRole->hexColor;
                 }
-                
+
                 return null;
             break;
             case 'displayName':
@@ -141,7 +141,7 @@ class GuildMember extends ClientBase {
                     if($prev === null) {
                         return $role;
                     }
-                    
+
                     return ($role->comparePositionTo($prev) > 0 ? $role : $prev);
                 });
             break;
@@ -149,16 +149,16 @@ class GuildMember extends ClientBase {
                 $roles = $this->roles->filter(function ($role) {
                     return $role->hoist;
                 });
-                
+
                 if($roles->count() === 0) {
                     return null;
                 }
-                
+
                 return $roles->reduce(function ($prev, $role) {
                     if($prev === null) {
                         return $role;
                     }
-                    
+
                     return ($role->comparePositionTo($prev) > 0 ? $role : $prev);
                 });
             break;
@@ -169,24 +169,24 @@ class GuildMember extends ClientBase {
                 if($this->id === $this->guild->ownerID || $this->id === $this->client->user->id) {
                     return false;
                 }
-                
+
                 $member = $this->guild->me;
                 if($member->permissions->has(\CharlotteDunois\Yasmin\Constants::PERMISSIONS['KICK_MEMBERS']) === false) {
                     return false;
                 }
-                
+
                 return ($member->highestRole->comparePositionTo($this->highestRole) > 0);
             break;
             case 'permissions':
                 if($this->id === $this->guild->ownerID) {
                     return (new \CharlotteDunois\Yasmin\Models\Permissions(\CharlotteDunois\Yasmin\Models\Permissions::ALL));
                 }
-                
+
                 $permissions = 0;
                 foreach($this->roles as $role) {
                     $permissions |= $role->permissions->bitfield;
                 }
-                
+
                 return (new \CharlotteDunois\Yasmin\Models\Permissions($permissions));
             break;
             case 'presence':
@@ -196,10 +196,10 @@ class GuildMember extends ClientBase {
                 return $this->guild->channels->get($this->voiceChannelID);
             break;
         }
-        
+
         return parent::__get($name);
     }
-    
+
     /**
      * Adds a role to the guild member. Resolves with $this.
      * @param \CharlotteDunois\Yasmin\Models\Role|string   $role    A role instance or role ID.
@@ -210,14 +210,14 @@ class GuildMember extends ClientBase {
         if($role instanceof \CharlotteDunois\Yasmin\Models\Role) {
             $role = $role->id;
         }
-        
+
         return (new \React\Promise\Promise(function (callable $resolve, callable $reject) use ($role, $reason) {
             $this->client->apimanager()->endpoints->guild->addGuildMemberRole($this->guild->id, $this->id, $role, $reason)->then(function () use ($resolve) {
                 $resolve($this);
             }, $reject)->done(null, array($this->client, 'handlePromiseRejection'));
         }));
     }
-    
+
     /**
      * Adds roles to the guild member. Resolves with $this.
      * @param array|\CharlotteDunois\Yasmin\Utils\Collection   $roles    A collection or array of Role instances or role IDs.
@@ -228,11 +228,11 @@ class GuildMember extends ClientBase {
         if($roles instanceof \CharlotteDunois\Yasmin\Utils\Collection) {
             $roles = $roles->all();
         }
-        
+
         $roles = \array_merge($this->roles->all(), $roles);
         return $this->edit(array('roles' => $roles), $reason);
     }
-    
+
     /**
      * Bans the guild member.
      * @param int     $days     Number of days of messages to delete (0-7).
@@ -244,7 +244,7 @@ class GuildMember extends ClientBase {
             return;
         });
     }
-    
+
     /**
      * Edits the guild member. Resolves with $this.
      *
@@ -267,44 +267,44 @@ class GuildMember extends ClientBase {
      */
     function edit(array $options, string $reason = '') {
         $data = array();
-        
+
         if(isset($options['nick'])) {
             $data['nick'] = (string) $options['nick'];
         }
-        
+
         if(isset($options['roles'])) {
             if($options['roles'] instanceof \CharlotteDunois\Yasmin\Utils\Collection) {
                 $options['roles'] = $options['roles']->all();
             }
-            
+
             $data['roles'] = \array_unique(\array_map(function ($role) {
                 if($role instanceof \CharlotteDunois\Yasmin\Models\Role) {
                     return $role->id;
                 }
-                
+
                 return $role;
             }, $options['roles']));
         }
-        
+
         if(isset($options['deaf'])) {
             $data['deaf'] = (bool) $options['deaf'];
         }
-        
+
         if(isset($options['mute'])) {
             $data['mute'] = (bool) $options['mute'];
         }
-        
+
         if(isset($options['channel'])) {
-            $data['channel_id'] = $this->guild->channels->resolve($options['channel']);
+            $data['channel_id'] = $this->guild->channels->resolve($options['channel'])->id;
         }
-        
+
         return (new \React\Promise\Promise(function (callable $resolve, callable $reject) use ($data, $reason) {
             $this->client->apimanager()->endpoints->guild->modifyGuildMember($this->guild->id, $this->id, $data, $reason)->then(function () use ($resolve) {
                 $resolve($this);
             }, $reject)->done(null, array($this->client, 'handlePromiseRejection'));
         }));
     }
-    
+
     /**
      * Kicks the guild member.
      * @param string  $reason
@@ -317,7 +317,7 @@ class GuildMember extends ClientBase {
             }, $reject)->done(null, array($this->client, 'handlePromiseRejection'));
         }));
     }
-    
+
     /**
      * Returns permissions for a member in a guild channel, taking into account roles and permission overwrites.
      * @param \CharlotteDunois\Yasmin\Interfaces\GuildChannelInterface|string  $channel
@@ -329,10 +329,10 @@ class GuildMember extends ClientBase {
         if(!($channel instanceof \CharlotteDunois\Yasmin\Interfaces\GuildChannelInterface)) {
             throw new \InvalidArgumentException('Given channel is not a guild channel');
         }
-        
+
         return $channel->permissionsFor($this);
     }
-    
+
     /**
      * Removes a role from the guild member. Resolves with $this.
      * @param \CharlotteDunois\Yasmin\Models\Role|string   $role    A role instance or role ID.
@@ -343,14 +343,14 @@ class GuildMember extends ClientBase {
         if($role instanceof \CharlotteDunois\Yasmin\Models\Role) {
             $role = $role->id;
         }
-        
+
         return (new \React\Promise\Promise(function (callable $resolve, callable $reject) use ($role, $reason) {
             $this->client->apimanager()->endpoints->guild->removeGuildMemberRole($this->guild->id, $this->id, $role, $reason)->then(function () use ($resolve) {
                 $resolve($this);
             }, $reject)->done(null, array($this->client, 'handlePromiseRejection'));
         }));
     }
-    
+
     /**
      * Removes roles from the guild member. Resolves with $this.
      * @param \CharlotteDunois\Yasmin\Utils\Collection|array<\CharlotteDunois\Yasmin\Models\Role>   $roles    A collection or array of role instances (or role IDs).
@@ -361,14 +361,14 @@ class GuildMember extends ClientBase {
         if($roles instanceof \CharlotteDunois\Yasmin\Utils\Collection) {
             $roles = $roles->all();
         }
-        
+
         $roles = \array_filter($this->roles->all(), function ($role) use ($roles) {
             return (!\in_array($role, $roles, true));
         });
-        
+
         return $this->edit(array('roles' => $roles), $reason);
     }
-    
+
     /**
      * Deafen/undeafen a guild member. Resolves with $this.
      * @param bool    $deaf
@@ -378,7 +378,7 @@ class GuildMember extends ClientBase {
     function setDeaf(bool $deaf, string $reason = '') {
         return $this->edit(array('deaf' => $deaf), $reason);
     }
-    
+
     /**
      * Mute/unmute a guild member. Resolves with $this.
      * @param bool    $mute
@@ -388,7 +388,7 @@ class GuildMember extends ClientBase {
     function setMute(bool $mute, string $reason = '') {
         return $this->edit(array('mute' => $mute), $reason);
     }
-    
+
     /**
      * Set the nickname of the guild member. Resolves with $this.
      * @param string  $nickname
@@ -403,10 +403,10 @@ class GuildMember extends ClientBase {
                 }, $reject)->done(null, array($this->client, 'handlePromiseRejection'));
             }));
         }
-        
+
         return $this->edit(array('nick' => $nickname), $reason);
     }
-    
+
     /**
      * Sets the roles of the guild member. Resolves with $this.
      * @param \CharlotteDunois\Yasmin\Utils\Collection|array<\CharlotteDunois\Yasmin\Models\Role>   $roles    A collection or array of role instances (or role IDs).
@@ -416,7 +416,7 @@ class GuildMember extends ClientBase {
     function setRoles($roles, string $reason = '') {
         return $this->edit(array('roles' => $roles), $reason);
     }
-    
+
     /**
      * Moves the guild member to the given voice channel, if connected to voice. Resolves with $this.
      * @param \CharlotteDunois\Yasmin\Models\VoiceChannel|string  $channel
@@ -427,21 +427,21 @@ class GuildMember extends ClientBase {
     function setVoiceChannel($channel, string $reason = '') {
         return $this->edit(array('channel' => $channel), $reason);
     }
-    
+
     /**
      * Automatically converts to a mention.
      */
     function __toString() {
         return '<@'.(!empty($this->nickname) ? '!' : '').$this->id.'>';
     }
-    
+
     /**
      * @internal
      */
     function _setSpeaking(bool $speaking) {
         $this->speaking = $speaking;
     }
-    
+
     /**
      * @internal
      */
@@ -454,7 +454,7 @@ class GuildMember extends ClientBase {
         $this->selfMute = (bool) $voice['self_mute'];
         $this->suppress = (bool) $voice['suppress'];
     }
-    
+
     /**
      * @internal
      */
@@ -464,14 +464,14 @@ class GuildMember extends ClientBase {
         } elseif($data['nick'] !== $this->nickname) {
             $this->nickname = $data['nick'];
         }
-        
+
         $this->deaf = (bool) ($data['deaf'] ?? false);
         $this->mute = (bool) ($data['mute'] ?? false);
-        
+
         if(isset($data['roles'])) {
             $this->roles->clear();
             $this->roles->set($this->guild->id, $this->guild->roles->get($this->guild->id));
-            
+
             foreach($data['roles'] as $role) {
                 if(!$this->roles->has($role)) {
                     $this->roles->set($role, $this->guild->roles->get($role));
